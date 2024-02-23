@@ -15,6 +15,7 @@ using namespace miosix;
 // a namespace for all the related constants
 namespace VUCONST{
     const uint8_t NUM_LEDS = 5;
+    const uint8_t NUM_BIT_ADC = 16;
     const int MAX_LEVEL = 31;
     const int MIN_LEVEL = 0;
 }
@@ -43,7 +44,7 @@ public:
      */
     void clear();
     void setHigh();
-    void showVal(int sound_val);
+    void showVal(unsigned int sound_val);
 
 private:
 
@@ -85,31 +86,33 @@ void Vumeter::setHigh(){
     G1.high();
 }
 
-void Vumeter::showVal(int sound_val){
-    int threshold = 1;
-    int value = 0;
+void Vumeter::showVal(unsigned int sound_val){
 
-    for(int i=0; i<5; i++){
-        if(sound_val >= threshold){
+    unsigned int threshold = 0;
+    unsigned int value = 0;
+    
+    for(int i=0; i<VUCONST::NUM_LEDS; i++){
+        if((sound_val>>(VUCONST::NUM_BIT_ADC - VUCONST::NUM_LEDS)) > threshold){
             value = (value << 1) | 1;
         }
-        threshold = (threshold << 3) + 7;
+        threshold = (threshold << 1) | 1;
     }
 
-    if(value && 0x00000001) G1.high();
-    else                    G1.low();
+    clear();
+    if(value & 0x00000001) G1.high();
+    else                   G1.low();
 
-    if(value && 0x00000002) Y2.high();
-    else                    Y2.low();
+    if(value & 0x00000002) Y2.high();
+    else                   Y2.low();
 
-    if(value && 0x00000004) Y1.high();
-    else                    Y1.low();
+    if(value & 0x00000004) Y1.high();
+    else                   Y1.low();
 
-    if(value && 0x00000008) R2.high();
-    else                    R2.low();
+    if(value & 0x00000008) R2.high();
+    else                   R2.low();
 
-    if(value && 0x00000010) R1.high();
-    else                    R1.low();
+    if(value & 0x00000010) R1.high();
+    else                   R1.low();
 
 }
 #endif //VUMETER_IMPL_H

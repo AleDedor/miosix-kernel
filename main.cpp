@@ -2,6 +2,7 @@
 #include <cstdio>
 #include "miosix.h"
 #include "vumeter.h"
+#include <interfaces/delays.h>
 
 using namespace std;
 using namespace miosix;
@@ -17,21 +18,18 @@ typedef Gpio<GPIOA_BASE,9> ledr2;
 int main()
 {
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
-    int val = 0;
+    unsigned int val = 0;
 
     while(1){
-        //meter.setHigh();
-        //Thread::sleep(500);
-        //meter.clear();
-        //Thread::sleep(500);
-        val++;
-        
-        if(val >= 1024){
+
+        meter.showVal(val);
+        delayUs(50);
+        //Thread::sleep(1);
+        if(val >= 65535){
             val=0;
             meter.clear();
         } 
-        //meter.showVal(128);
-        Thread::sleep(100);
+        val++;
     }
     
     //iprintf("Hello world, write your application here\n");
