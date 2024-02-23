@@ -15,7 +15,7 @@ using namespace miosix;
 // a namespace for all the related constants
 namespace VUCONST{
     const uint8_t NUM_LEDS = 5;
-    const int MAX_LEVEL = 1024;
+    const int MAX_LEVEL = 31;
     const int MIN_LEVEL = 0;
 }
 
@@ -43,6 +43,7 @@ public:
      */
     void clear();
     void setHigh();
+    void showVal(int sound_val);
 
 private:
 
@@ -66,7 +67,7 @@ Vumeter::Vumeter(GpioPin Rled1, GpioPin Rled2, GpioPin Yled1, GpioPin Yled2, Gpi
     G1.mode(Mode::OUTPUT);
 }
 
-//definition of clear()
+//Reset all LEDs
 void Vumeter::clear(){
     R1.low();
     R2.low();
@@ -75,6 +76,7 @@ void Vumeter::clear(){
     G1.low();
 }
 
+//Set all LEDs
 void Vumeter::setHigh(){
     R1.high();
     R2.high();
@@ -83,5 +85,31 @@ void Vumeter::setHigh(){
     G1.high();
 }
 
+void Vumeter::showVal(int sound_val){
+    int threshold = 1;
+    int value = 0;
 
+    for(int i=0; i<5; i++){
+        if(sound_val >= threshold){
+            value = (value << 1) | 1;
+        }
+        threshold = (threshold << 3) + 7;
+    }
+
+    if(value && 0x00000001) G1.high();
+    else                    G1.low();
+
+    if(value && 0x00000002) Y2.high();
+    else                    Y2.low();
+
+    if(value && 0x00000004) Y1.high();
+    else                    Y1.low();
+
+    if(value && 0x00000008) R2.high();
+    else                    R2.low();
+
+    if(value && 0x00000010) R1.high();
+    else                    R1.low();
+
+}
 #endif //VUMETER_IMPL_H
