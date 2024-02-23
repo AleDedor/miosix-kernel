@@ -1,6 +1,7 @@
 
 #include <cstdio>
 #include "miosix.h"
+#include "vumeter.h"
 
 using namespace std;
 using namespace miosix;
@@ -15,19 +16,13 @@ typedef Gpio<GPIOA_BASE,9> ledr2;
 
 int main()
 {
-    ledg1::mode(Mode::OUTPUT);
-    ledy1::mode(Mode::OUTPUT);
-    ledy2::mode(Mode::OUTPUT);
-    ledr1::mode(Mode::OUTPUT);
-    ledr2::mode(Mode::OUTPUT);
+    Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
 
 
     while(1){
-        ledg1::high();
-        ledy2::high();
+        meter.setHigh();
         Thread::sleep(500);
-        ledg1::low();
-        ledy2::low();
+        meter.clear();
         Thread::sleep(500);
     }
     
