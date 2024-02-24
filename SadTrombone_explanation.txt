@@ -1,0 +1,144 @@
+Everything happens in the "Player" class since in the main.cpp the method play() is called and that's it.
+
+In the Player class, the method Player::play() is the most important part.
+
+- Upon entering the play() function, a lock is locked with the instruction "Lock<Mutex> l(mutex);", from chat GPT:
+
+    The code Lock<Mutex> l(mutex); appears to be a hypothetical instantiation of a generic Lock class template with a Mutex template parameter.
+
+    In this context, Lock is likely a generic wrapper class that provides RAII semantics for managing locks. The Mutex template parameter represents the type of mutex being used. The l variable is an instance of this Lock class.
+
+So we are basically locking the mutex l, with a RAII semantic, the scope is the whole play() method and the mutex will be unlocked upon thermination of the play() method.
+
+- Then a buffer queue "bq" is created, of size 256*16bits, the "new" keyword is used to dynamically allocate memory for objects or arrays during runtime. 
+the bq is the shared memory that will be used by the main thread and the DMA. The main thread loads the sound data on the buffer, the DMA send the data to the SPI. Therefore this data sharing must be correclty managed 
+
+- Then, inside a scope defined by curly braces, a FastInterruptDisableLock object called dlock is created. From the Miosix documentation:
+
+    "This class is a RAII lock for disabling interrupts. This call avoids the error of not reenabling interrupts since it is done automatically."
+
+so we are disabling the interrupts (done in the class constructor), then we execute the instructions inside the scope, which are: enabling the DMA and I2S, configure all GPIOs, enable PLL for I2S.
+
+- After the interrupts have been reactivated (by exiting the scope), a while loop is used to wait for the PLL to lock. 
+
+- Then reset of the codec (likely) is performed and then all the I2C configurations are sent with the cs43l22send() function, which inside calls the i2c::send() functions
+
+- After that, I2S is enabled by setting the corresponding regiters and the DMA interrupt is enabled with the NVIC_EnableIRQ() function. NB DMA hasn't been started yet
+
+- "memset(getWritableBuffer(),0,bufferSize*sizeof(unsigned short));" is used to set all the bq bytes to 0, note that "getWritableBuffer()" is used as parameter.
+This function is defined a bit above in the player.cpp, inside it does the following:
+
+    static unsigned short *getWritableBuffer()
+    {
+        FastInterruptDisableLock dLock;
+        unsigned short *result;
+        while(bq->tryGetWritableBuffer(result)==false)
+        {
+            waiting->IRQwait();
+            {
+                FastInterruptEnableLock eLock(dLock);
+                Thread::yield();
+            }
+        }
+        return result;
+    }
+
+    All interrupts are disabled, TryGetWritableBuffer() from the Miosix documentation:
+    "This member function allows to retrieve a buffer ready to be written, if available." so if the bq is not ready to be written (the DMA is reading it) we put the thread to sleep with IRQWait().
+    We re-enable the interrupts and call yield() which "When called, suggests the kernel to pause the current thread, and run another one."
+    The thread will be woken up in the DMA callback (I2SdmaHandlerImpl, see after) by waiting->IRQwakeup(); when the DMA is done reading. (or at least I think, must investigate further)
+
+- after the bq has been written 0 into it, bufferFilled() is called, which from the documentation: "After having called tryGetWritableBuffer() to retrieve a buffer and having filled it, this member function allows to mark the buffer as available on the reader side."
+so we are saying to the bq that it has been written and the DMA can now, if it needs to, read it.
+
+- sound.rewind() sets the pointer to the beginning of the sound file (not important for us)
+
+- waiting pointer is assigned the current thread with waiting=Thread::getCurrentThread() (still have to figure out exactly this waiting thing)
+
+-------------------------------------------------THIS IS WHERE ALL THE GOOD STUFF HAPPENS, JUICY SYNCHRONIZATION -------------------------------------------------------------------------------------------------------------------------
+
+- we enter a for cycle that will be performed until we reach the end of the sound file. In the for cycle:
+
+    if(enobuf)
+    {
+        enobuf=false;
+        dmaRefill();
+        if(first)
+        {
+            first=false;
+            cs43l22send(0x02,0x9e);
+        }
+    }
+    if(sound.fillStereoBuffer(getWritableBuffer(),bufferSize)) break;
+    bufferFilled();
+
+    enobuf is a flag that is set to true if the DMA can't access a readable bq, meaning that the buffer is still being written (enobuf is modified in dmaRefill(), see after)
+    enobuf is initalized to true so at the first cycle the if condition is entered and the dmaRefill() function called. The dmaRefill() function disables interrupts and calls IRQdmaRefill():
+    The IRQdmaRefill() function is used to start the DMA when the bq is ready to be read. In the function the first thing done is:
+
+    if(bq->tryGetReadableBuffer(buffer,size)==false)
+    {
+        enobuf=true;
+        return;
+    }
+
+    so if the bq is readable, the if is not executed, the function goes on and the registers to activate the DMA are set and the DMA is started, else enobuf is set to true again and the function is stopped with return.
+    In case the bq was not ready to be read (it's being written), we come back to our for loop with enobu=true and the next instruction is:
+
+        if(sound.fillStereoBuffer(getWritableBuffer(),bufferSize)) break; 
+
+    which from the comment in the library: the function fillStereoBuffer() writes the sound data into the buffer, returns true only when EOF is reached. Note that getWritableBuffer() is called!! As seen before, this function will put the thread to sleep if the bq is not ready to be written.
+    Let's say that we can write into the buffer, the function writes the sound data but we are not at the EOF, so the next instruction is:
+    
+        bufferFilled();
+
+    which as see before: "After having called tryGetWritableBuffer() to retrieve a buffer and having filled it, this member function allows to mark the buffer as available on the reader side."
+    now the next cycle of the for loop, we enter the if, we call the dmaRefill, and the bq is ready to be read so the DMA is started (and enobuf=false).
+
+    NB!!! the DMA is started so the bq is being read, now we come back to the for cycle and we execute:
+
+        if(sound.fillStereoBuffer(getWritableBuffer(),bufferSize)) break; 
+
+    but the getWritableBuffer() will put the thread to sleep until the DMA callback indicates that the reading operation has ended.
+
+- the DMA call back is implemented with the following two functions:
+
+    void __attribute__((naked)) DMA1_Stream5_IRQHandler()
+    {
+        saveContext();
+        asm volatile("bl _Z17I2SdmaHandlerImplv");
+        restoreContext();
+    }
+
+    /**
+    * DMA end of transfer interrupt actual implementation
+    */
+    void __attribute__((used)) I2SdmaHandlerImpl()
+    {
+        DMA1->HIFCR=DMA_HIFCR_CTCIF5  |
+                    DMA_HIFCR_CTEIF5  |
+                    DMA_HIFCR_CDMEIF5 |
+                    DMA_HIFCR_CFEIF5;
+        bq->bufferEmptied();
+        IRQdmaRefill();
+        waiting->IRQwakeup();
+        if(waiting->IRQgetPriority()>Thread::IRQgetCurrentThread()->IRQgetPriority())
+            Scheduler::IRQfindNextThread();
+    }
+
+    when the DMA has ended sending the bq content to the I2S pheripheral, the callback is called. (the first one I don't know what it does but it execute some assembly code)
+    the second one, reset the DMA settings (I guess), indicates that the bq is ready to be written (IRQdmaRefill()) then calls the IRQdmaRefill() to try to see if DMA can be activated again (?) and lastly calls wakeup on the sleeping thread (like the one we put to sleep in the getWritableBuffer() when we couldn't access a writable bq).
+    with: 
+
+        if(waiting->IRQgetPriority()>Thread::IRQgetCurrentThread()->IRQgetPriority())
+            Scheduler::IRQfindNextThread();
+
+    wakes up the highest priority thread sleeping.
+
+
+- The process above, in the for loop in repeated until EOF is reached. At that point the for loop is exited. Some cleanup operations are done but I lost la voglia ora vado a mangiare la pasta e fagioli buona.
+anora non ho capito cosa serva l'istruzione:
+    atomicTestAndWaitUntil(enobuf,true); //Continue sending MCLK for some time
+eseguita nelle operazioni di cleanup
+
+
