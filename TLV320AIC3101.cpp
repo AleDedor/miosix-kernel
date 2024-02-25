@@ -61,8 +61,8 @@ void TLV320::setup()
         lrclk::alternateFunction(6);
 
         //enabling PLL for I2S and starting clock
-        //PLLI2SR=5, PLLI2SN=123
-        RCC->PLLI2SCFGR=(5<<28) | (123<<6);
+        //PLLI2SR=3, PLLI2SN=258 see datasheet pag.595
+        RCC->PLLI2SCFGR=(3<<28) | (258<<6);
         RCC->CR |= RCC_CR_PLLI2SON;
     }
 
@@ -97,7 +97,18 @@ void TLV320::setup()
 
     //enable DMA on I2S, RX mode
     SPI2->CR2=SPI_CR2_RXDMAEN;
-    //I2S prescaler register -> clk enable 
+    //I2S prescaler register, see pag.595
+    SPI2->I2SPR=  SPI_I2SPR_MCKOE //mclk enable
+                | SPI_I2SPR_ODD   //ODD = 1
+                | 3;              //I2SDIV = 3
+    
+    SPI2->I2SCFGR=SPI_I2SCFGR_I2SMOD    //I2S mode selected
+                | SPI_I2SCFGR_I2SE      //I2S Enabled
+                | SPI_I2SCFGR_I2SCFG;   //Master receive
+
+    //set DMA interrupt priority
+    NVIC_SetPriority(DMA1_Stream3_IRQn,2); //high prio
+    NVIC_EnableIRQ(DMA1_Stream3_IRQn);     //enable interrupt
 
     
 }
