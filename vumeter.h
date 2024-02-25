@@ -6,11 +6,6 @@
 #include "interfaces/gpio.h"
 
 using namespace miosix;
-//#include <vector> // allows to create vector of classes
-
-// inside main, initialization 
-/*Vumeter vumeter(led1::getPin(),led2::getPin(),led3::getPin(),
-                     led4::getPin(),led5::getPin(),led6::getPin());*/
 
 // a namespace for all the related constants
 namespace VUCONST{
@@ -20,16 +15,17 @@ namespace VUCONST{
     const int MIN_LEVEL = 0;
 }
 
-
-//vector<Gpio> leds; // a vector size can be changed dinamically, array = fixed
-
 class Vumeter // fixed @6 leds
 {
 public:
-    // constructor (init) + adjust levels + clear all
+    /**  Main idea of the VU-Meter: must be able to display the sampled
+     *   sound value in a log scale. Let's use the constructor to initialize
+     *   the passed Led pins (set them as outputs), define some simple functions
+     *   to turn on / off all the leds (debug purposes) and finally display the value.
+     */
 
     /**
-     * Constructor, initializes the vumeter
+     * Constructor, initializes the vumeter pins @ OUTPUT
      * \param Rled1 a Gpio class specifying the GPIO connected to the Rled1
      * \param Rled2 a Gpio class specifying the GPIO connected to the Rled2
      * \param Yled1 a Gpio class specifying the GPIO connected to the Yled1
@@ -43,7 +39,18 @@ public:
      * turn off all the leds
      */
     void clear();
+
+    /**
+     * turn on all the leds
+     */
     void setHigh();
+
+    /**
+     * Display the sound value with the VU-Meter
+     * \param sound_val a 16-bit integer coming from Codec ADC -> we use an int (32-bit) value
+     * because max ADC #bits is 32. 
+     * The value is displayed in a logarithmic scale.
+     */
     void showVal(unsigned int sound_val);
 
 private:
@@ -59,7 +66,7 @@ private:
 
 // here the definition of the contructor
 Vumeter::Vumeter(GpioPin Rled1, GpioPin Rled2, GpioPin Yled1, GpioPin Yled2, GpioPin Gled1) 
-: R1(Rled1), R2(Rled2), Y1(Yled1), Y2(Yled2), G1(Gled1) //assign passed parameters to class variables
+: R1(Rled1), R2(Rled2), Y1(Yled1), Y2(Yled2), G1(Gled1) //init list, assign passed parameters to class variables
 {
     R1.mode(Mode::OUTPUT);
     R2.mode(Mode::OUTPUT);
@@ -86,6 +93,7 @@ void Vumeter::setHigh(){
     G1.high();
 }
 
+// Display the sound value
 void Vumeter::showVal(unsigned int sound_val){
 
     unsigned int threshold = 0;
