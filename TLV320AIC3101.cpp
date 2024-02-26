@@ -1,6 +1,8 @@
 #include <cstdio>
 #include "miosix.h"
 #include "util/software_i2c.h"
+#include "miosix/kernel/scheduler/scheduler.h"
+#include "TLV320AIC3101.h"
 
 using namespace std;
 using namespace miosix;
@@ -17,10 +19,10 @@ typedef Gpio<GPIOB_BASE,12> lrclk;
 typedef Gpio<GPIOC_BASE,2> sdin;
 typedef Gpio<GPIOC_BASE,3> sdout;
 
-static const int bufferSize = 256;
+static const int bufferSize = 128;
 unsigned int size;
 static Thread *waiting;
-BufferQueue<unsigned short, bufferSize> bq;
+BufferQueue<unsigned short, bufferSize> *bq;
 //BufferQueue<unsigned short, bufferSize, 3> bq; for version with also TX
 
 //---------------------------I2C Codec communication function----------------------------------------
@@ -34,10 +36,10 @@ static void TLV320AIC3101_I2C_Send(unsigned char regAddress, char data)
 }
 
 //---------------------------Try to get a writable buffer--------------------------------------------
-unsigned short *getReadableBuff()
+const unsigned short *getReadableBuff()
 {
     FastInterruptDisableLock dLock;
-    unsigned short *readableBuff;
+    const unsigned short *readableBuff;
 
     //try to find the writable buffer among the 2
     while(bq->tryGetReadableBuffer(readableBuff,size)==false){
@@ -68,7 +70,7 @@ void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
                 DMA_HIFCR_CDMEIF5 | //clear direct mode error flag
                 DMA_HIFCR_CFEIF5;   //clear fifo error interrupt flag
 
-	bq->bufferFilled();
+	bq->bufferFilled(size);
 	waiting->IRQwakeup();
 	if(waiting->IRQgetPriority()>Thread::IRQgetCurrentThread()->IRQgetPriority())
 		Scheduler::IRQfindNextThread();
@@ -82,16 +84,11 @@ void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
 }*/
 
 //--------------------------Function for starting the DMA RX-----------------------------------------
-void TLV320::startRx()
-{
-    FastInterruptDisableLock dLock;
-    startRxDMA();
-}
-
 static void startRxDMA(){ //needed to make sure that the lock reaches the scopes at the end of the startRX()
-    const unsigned short *buffer;
+    
+    unsigned short *buffer;
 
-    if(tryGetWritableBuffer(buffer) == false){
+    if(bq->tryGetWritableBuffer(buffer) == false){
         return;
     }
 
@@ -108,8 +105,14 @@ static void startRxDMA(){ //needed to make sure that the lock reaches the scopes
 			  	      DMA_SxCR_EN;       //Start the DMA
 }
 
+void TLV320AIC3101::startRx()
+{
+    FastInterruptDisableLock dLock;
+    startRxDMA();
+}
+
 //------------------------Codec initialization and setup method------------------------------------
-void TLV320::setup()
+void TLV320AIC3101::setup()
 {
     Lock<Mutex> l(mutex);
 
@@ -125,7 +128,7 @@ void TLV320::setup()
         RCC_SYNC();
 
         //GPIO configuration
-        i2c::init();
+        I2C::init();
         mclk::mode(Mode::ALTERNATE);
         mclk::alternateFunction(6);
         sclk::mode(Mode::ALTERNATE);
@@ -185,8 +188,15 @@ void TLV320::setup()
     //set DMA interrupt priority
     NVIC_SetPriority(DMA1_Stream3_IRQn,2); //high prio
     NVIC_EnableIRQ(DMA1_Stream3_IRQn);     //enable interrupt
-
-    startDMArx();
-
 }
+
+//-------------------------------TLV320 class constructors------------------------------------------
+TLV320AIC3101& TLV320AIC3101::instance()
+{
+	static TLV320AIC3101 singleton;
+	return singleton;
+}
+
+TLV320AIC3101::TLV320AIC3101(){}
+
 //----------------------------------------------------------------------------------------------------

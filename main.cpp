@@ -3,6 +3,7 @@
 #include "miosix.h"
 #include "vumeter.h"
 #include <interfaces/delays.h>
+#include "TLV320AIC3101.h"
 
 using namespace std;
 using namespace miosix;
@@ -18,10 +19,13 @@ typedef Gpio<GPIOA_BASE,9> ledr2;
 int main()
 {
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
-    unsigned int val = 0;
+
+    TLV320AIC3101::instance().setup();
+    //TLV320AIC3101::instance().startRx();
+
+    unsigned int val = 10096;
 
     while(1){
-
         meter.showVal(val);
         delayUs(50);
         //Thread::sleep(1);
@@ -31,6 +35,7 @@ int main()
         } 
         val++;
     }
-    
-    //iprintf("Hello world, write your application here\n");
 }
+    
+//iprintf("Hello world, write your application here\n");
+
