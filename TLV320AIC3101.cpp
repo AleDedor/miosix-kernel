@@ -8,7 +8,7 @@ using namespace miosix;
 //Gpios for I2C
 typedef Gpio<GPIOB_BASE,7> sda;
 typedef Gpio<GPIOB_BASE,6> scl;
-typedef SoftwareI2C<sda,scl> i2c;
+typedef SoftwareI2C<sda,scl> I2C;
 
 //Gpios for I2S
 typedef Gpio<GPIOC_BASE,6> mclk;
@@ -18,11 +18,10 @@ typedef Gpio<GPIOC_BASE,2> sdin;
 typedef Gpio<GPIOC_BASE,3> sdout;
 
 static const int bufferSize = 256;
+unsigned int size;
 static Thread *waiting;
-BufferQueue<unsigned short, bufferSize> *bq1;
-BufferQueue<unsigned short, bufferSize> *bq2;
-//BufferQueue<unsigned short, bufferSize> *bq3; FOR TX, later
-BufferQueue<unsigned short, bufferSize> *bqStream3; //to store the buffer queue currently written by DMA stream 3
+BufferQueue<unsigned short, bufferSize> bq;
+//BufferQueue<unsigned short, bufferSize, 3> bq; for version with also TX
 
 //---------------------------I2C Codec communication function----------------------------------------
 static void TLV320AIC3101_I2C_Send(unsigned char regAddress, char data)
@@ -34,23 +33,26 @@ static void TLV320AIC3101_I2C_Send(unsigned char regAddress, char data)
     I2C::sendStop();
 }
 
-//--------------------------Function for starting the DMA RX-----------------------------------------
-void startRx()
+//---------------------------Try to get a writable buffer--------------------------------------------
+unsigned short *getReadableBuff()
 {
-    const unsigned short *buffer;
-	unsigned int size;
+    FastInterruptDisableLock dLock;
+    unsigned short *readableBuff;
 
+    //try to find the writable buffer among the 2
+    while(bq->tryGetReadableBuffer(readableBuff,size)==false){
 
-}
-
-//--------------------Process the bq which is not read or written------------------------------------
-void processBuffer(){
-
-
+        //sleep until a buffer is marked as writable
+        waiting->IRQwait();
+		{
+			FastInterruptEnableLock eLock(dLock);
+			Thread::yield();
+		} 
+    }
+    return readableBuff;
 }
 
 //-------------------------------IRQ handler function------------------------------------------------
-
 void __attribute__((naked)) DMA1_Stream3_IRQHandler()
 {
     saveContext();
@@ -66,31 +68,44 @@ void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
                 DMA_HIFCR_CDMEIF5 | //clear direct mode error flag
                 DMA_HIFCR_CFEIF5;   //clear fifo error interrupt flag
 
-	//bq->bufferEmptied();
-	//IRQdmaRefill();
+	bq->bufferFilled();
 	waiting->IRQwakeup();
 	if(waiting->IRQgetPriority()>Thread::IRQgetCurrentThread()->IRQgetPriority())
 		Scheduler::IRQfindNextThread();
 }
 
-//---------------------------Try to get a writable buffer--------------------------------------------
-static unsigned short *getWritableBuff()
+//--------------------Process the bq which is not read or written------------------------------------
+
+/*void TLV320::processBuffer(){
+
+
+}*/
+
+//--------------------------Function for starting the DMA RX-----------------------------------------
+void TLV320::startRx()
 {
     FastInterruptDisableLock dLock;
-    unsigned short *writableBuff;
+    startRxDMA();
+}
 
-    //try to find the writable buffer among the 3
-    while((bq1->tryGetWritableBuffer(writableBuff)==false)
-        &&(bq2->tryGetWritableBuffer(writableBuff)==false)){
+static void startRxDMA(){ //needed to make sure that the lock reaches the scopes at the end of the startRX()
+    const unsigned short *buffer;
 
-        //sleep until a buffer is marked as writable
-        waiting->IRQwait();
-		{
-			FastInterruptEnableLock eLock(dLock);
-			Thread::yield();
-		} 
+    if(tryGetWritableBuffer(buffer) == false){
+        return;
     }
-    return writableBuff;
+
+    //Start DMA
+    DMA1_Stream3->CR=0; //reset configuration register to 0
+    DMA1_Stream3->PAR = reinterpret_cast<unsigned int>(&SPI2->DR); //pheripheral address set to SPI2
+    DMA1_Stream3->M0AR = reinterpret_cast<unsigned int>(buffer);   //set buffer as destination
+    DMA1_Stream3->NDTR = bufferSize;                                     //size of buffer to fulfill
+    DMA1_Stream3->CR= DMA_SxCR_PL_1    | //High priority DMA stream
+                      DMA_SxCR_MSIZE_0 | //Read  16bit at a time from RAM
+					  DMA_SxCR_PSIZE_0 | //Write 16bit at a time to SPI
+				      DMA_SxCR_MINC    | //Increment RAM pointer after each transfer
+			          DMA_SxCR_TCIE    | //Interrupt on completion
+			  	      DMA_SxCR_EN;       //Start the DMA
 }
 
 //------------------------Codec initialization and setup method------------------------------------
@@ -99,9 +114,7 @@ void TLV320::setup()
     Lock<Mutex> l(mutex);
 
     //allocation of memory for 2 buffer queues
-    bq1 = new BufferQueue<unsigned short, bufferSize>();
-    bq2 = new BufferQueue<unsigned short, bufferSize>();
-    //bq3 = new BufferQueue<unsigned short, bufferSize>(); FOR TX, later
+    bq = new BufferQueue<unsigned short, bufferSize>();
 
     {
         FastInterruptDisableLock dLock;
