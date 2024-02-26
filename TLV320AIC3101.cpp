@@ -18,21 +18,82 @@ typedef Gpio<GPIOC_BASE,2> sdin;
 typedef Gpio<GPIOC_BASE,3> sdout;
 
 static const int bufferSize = 256;
-static BufferQueue<unsigned short, bufferSize> *bq1;
-static BufferQueue<unsigned short, bufferSize> *bq2;
+static Thread *waiting;
+BufferQueue<unsigned short, bufferSize> *bq1;
+BufferQueue<unsigned short, bufferSize> *bq2;
+//BufferQueue<unsigned short, bufferSize> *bq3; FOR TX, later
+BufferQueue<unsigned short, bufferSize> *bqStream3; //to store the buffer queue currently written by DMA stream 3
 
-//---------------------------I2C Codec communication function---------------------------------------
-static void TLV320AIC3101_I2C_Send(unsigned char regAddress, char data){
+//---------------------------I2C Codec communication function----------------------------------------
+static void TLV320AIC3101_I2C_Send(unsigned char regAddress, char data)
+{
     I2C::sendStart();
     I2C::send(0b00110000);
     I2C::send(regAddress);
     I2C::send(data);
     I2C::sendStop();
 }
-//--------------------------------------------------------------------------------------------------
+
+//--------------------------Function for starting the DMA RX-----------------------------------------
+void startRx()
+{
+    const unsigned short *buffer;
+	unsigned int size;
 
 
-//------------------------Codec initialization and setup function------------------------------------
+}
+
+//--------------------Process the bq which is not read or written------------------------------------
+void processBuffer(){
+
+
+}
+
+//-------------------------------IRQ handler function------------------------------------------------
+
+void __attribute__((naked)) DMA1_Stream3_IRQHandler()
+{
+    saveContext();
+	asm volatile("bl _Z17I2SdmaHandlerImplv");
+	restoreContext();
+}
+
+void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
+{
+    //clear DMA1 interrupt flags
+	DMA1->HIFCR=DMA_HIFCR_CTCIF5  | //clear transfer complete flag 
+                DMA_HIFCR_CTEIF5  | //clear transfer error flag
+                DMA_HIFCR_CDMEIF5 | //clear direct mode error flag
+                DMA_HIFCR_CFEIF5;   //clear fifo error interrupt flag
+
+	//bq->bufferEmptied();
+	//IRQdmaRefill();
+	waiting->IRQwakeup();
+	if(waiting->IRQgetPriority()>Thread::IRQgetCurrentThread()->IRQgetPriority())
+		Scheduler::IRQfindNextThread();
+}
+
+//---------------------------Try to get a writable buffer--------------------------------------------
+static unsigned short *getWritableBuff()
+{
+    FastInterruptDisableLock dLock;
+    unsigned short *writableBuff;
+
+    //try to find the writable buffer among the 3
+    while((bq1->tryGetWritableBuffer(writableBuff)==false)
+        &&(bq2->tryGetWritableBuffer(writableBuff)==false)){
+
+        //sleep until a buffer is marked as writable
+        waiting->IRQwait();
+		{
+			FastInterruptEnableLock eLock(dLock);
+			Thread::yield();
+		} 
+    }
+    return writableBuff;
+}
+
+//------------------------Codec initialization and setup method------------------------------------
 void TLV320::setup()
 {
     Lock<Mutex> l(mutex);
@@ -40,6 +101,7 @@ void TLV320::setup()
     //allocation of memory for 2 buffer queues
     bq1 = new BufferQueue<unsigned short, bufferSize>();
     bq2 = new BufferQueue<unsigned short, bufferSize>();
+    //bq3 = new BufferQueue<unsigned short, bufferSize>(); FOR TX, later
 
     {
         FastInterruptDisableLock dLock;
@@ -70,6 +132,7 @@ void TLV320::setup()
     while((RCC->CR & RCC_CR_PLLI2SRDY)==0);
 
     //Send TLV320AIC3101 configuration registers with I2C
+    delayMs(10);
     TLV320AIC3101_I2C_Send(0x01,0b10000000);
     TLV320AIC3101_I2C_Send(0x02,0b00000000);
     TLV320AIC3101_I2C_Send(0x01,0b00010001);
@@ -109,6 +172,8 @@ void TLV320::setup()
     //set DMA interrupt priority
     NVIC_SetPriority(DMA1_Stream3_IRQn,2); //high prio
     NVIC_EnableIRQ(DMA1_Stream3_IRQn);     //enable interrupt
+
+    startDMArx();
 
 }
 //----------------------------------------------------------------------------------------------------
