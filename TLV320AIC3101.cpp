@@ -110,6 +110,5 @@ void TLV320::setup()
     NVIC_SetPriority(DMA1_Stream3_IRQn,2); //high prio
     NVIC_EnableIRQ(DMA1_Stream3_IRQn);     //enable interrupt
 
-    
 }
 //----------------------------------------------------------------------------------------------------
