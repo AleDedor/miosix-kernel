@@ -25,14 +25,36 @@ static Thread *waiting;
 BufferQueue<unsigned short, bufferSize> *bq;
 //BufferQueue<unsigned short, bufferSize, 3> bq; for version with also TX
 
+//------------------------Codec instance, Singleton pattern ------------------------------------
+/* Singleton is a creational design pattern that lets you ensure that a class has only one instance, 
+ * while providing a global access point to this instance. 
+ */
+TLV320AIC3101& TLV320AIC3101::instance()
+{
+	static TLV320AIC3101 singleton;
+	return singleton;
+}
+
+TLV320AIC3101::TLV320AIC3101(){}
+
 //---------------------------I2C Codec communication function----------------------------------------
-static void TLV320AIC3101_I2C_Send(unsigned char regAddress, char data)
+static void TLV320AIC3101::I2C_Send(unsigned char regAddress, char data)
 {
     I2C::sendStart();
-    I2C::send(0b00110000);
+    I2C::send(TLV320AIC3101::I2C_address);
     I2C::send(regAddress);
     I2C::send(data);
     I2C::sendStop();
+}
+
+unsigned char TLV320AIC3101::I2C_Receive(unsigned char regAddress){
+    unsigned char data = 0;
+    I2C::sendStart();
+    I2C::send(TLV320AIC3101::I2C_address);
+    I2C::send(regAddress);
+    data = I2C::recvWithNack();
+    I2C::sendStop();
+    return data;
 }
 
 //---------------------------Try to get a writable buffer--------------------------------------------
@@ -83,7 +105,7 @@ void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
 
 }*/
 
-//--------------------------Function for starting the DMA RX-----------------------------------------
+//--------------------------Function for starting the I2S DMA RX-----------------------------------------
 static void startRxDMA(){ //needed to make sure that the lock reaches the scopes at the end of the startRX()
     
     unsigned short *buffer;
@@ -96,7 +118,7 @@ static void startRxDMA(){ //needed to make sure that the lock reaches the scopes
     DMA1_Stream3->CR=0; //reset configuration register to 0
     DMA1_Stream3->PAR = reinterpret_cast<unsigned int>(&SPI2->DR); //pheripheral address set to SPI2
     DMA1_Stream3->M0AR = reinterpret_cast<unsigned int>(buffer);   //set buffer as destination
-    DMA1_Stream3->NDTR = bufferSize;                                     //size of buffer to fulfill
+    DMA1_Stream3->NDTR = bufferSize;                               //size of buffer to fulfill
     DMA1_Stream3->CR= DMA_SxCR_PL_1    | //High priority DMA stream
                       DMA_SxCR_MSIZE_0 | //Read  16bit at a time from RAM
 					  DMA_SxCR_PSIZE_0 | //Write 16bit at a time to SPI
@@ -105,7 +127,7 @@ static void startRxDMA(){ //needed to make sure that the lock reaches the scopes
 			  	      DMA_SxCR_EN;       //Start the DMA
 }
 
-void TLV320AIC3101::startRx()
+void TLV320AIC3101::I2S_startRx()
 {
     FastInterruptDisableLock dLock;
     startRxDMA();
@@ -149,30 +171,30 @@ void TLV320AIC3101::setup()
 
     //Send TLV320AIC3101 configuration registers with I2C
     delayMs(10);
-    TLV320AIC3101_I2C_Send(0x01,0b10000000);
-    TLV320AIC3101_I2C_Send(0x02,0b00000000);
-    TLV320AIC3101_I2C_Send(0x01,0b00010001);
-    TLV320AIC3101_I2C_Send(0x07,0b00001010);
-    TLV320AIC3101_I2C_Send(0x0C,0b00000000);
-    TLV320AIC3101_I2C_Send(0x0E,0b10001000);
-    TLV320AIC3101_I2C_Send(0x0F,0b00001100);
-    TLV320AIC3101_I2C_Send(0x10,0b00001100);
-    TLV320AIC3101_I2C_Send(0x11,0b00001111);
-    TLV320AIC3101_I2C_Send(0x12,0b11110000);
-    TLV320AIC3101_I2C_Send(0x13,0b01111111);
-    TLV320AIC3101_I2C_Send(0x16,0b01111111);
-    TLV320AIC3101_I2C_Send(0x25,0b11010000);
-    TLV320AIC3101_I2C_Send(0x26,0b00001100);
-    TLV320AIC3101_I2C_Send(0x28,0b10000010);
-    TLV320AIC3101_I2C_Send(0x29,0b10100000);
-    TLV320AIC3101_I2C_Send(0x2a,0b00010100);
-    TLV320AIC3101_I2C_Send(0x2b,0b00000000);
-    TLV320AIC3101_I2C_Send(0x2c,0b00000000);
-    TLV320AIC3101_I2C_Send(0x33,0b10011111);
-    TLV320AIC3101_I2C_Send(0x3f,0b00000000);
-    TLV320AIC3101_I2C_Send(0x41,0b10011111);
-    TLV320AIC3101_I2C_Send(0x65,0b00000001);
-    TLV320AIC3101_I2C_Send(0x66,0b00000010);
+    TLV320AIC3101::I2C_Send(0x01,0b10000000);
+    TLV320AIC3101::I2C_Send(0x02,0b00000000);
+    TLV320AIC3101::I2C_Send(0x01,0b00010001);
+    TLV320AIC3101::I2C_Send(0x07,0b00001010);
+    TLV320AIC3101::I2C_Send(0x0C,0b00000000);
+    TLV320AIC3101::I2C_Send(0x0E,0b10001000);
+    TLV320AIC3101::I2C_Send(0x0F,0b00001100);
+    TLV320AIC3101::I2C_Send(0x10,0b00001100);
+    TLV320AIC3101::I2C_Send(0x11,0b00001111);
+    TLV320AIC3101::I2C_Send(0x12,0b11110000);
+    TLV320AIC3101::I2C_Send(0x13,0b01111111);
+    TLV320AIC3101::I2C_Send(0x16,0b01111111);
+    TLV320AIC3101::I2C_Send(0x25,0b11010000);
+    TLV320AIC3101::I2C_Send(0x26,0b00001100);
+    TLV320AIC3101::I2C_Send(0x28,0b10000010);
+    TLV320AIC3101::I2C_Send(0x29,0b10100000);
+    TLV320AIC3101::I2C_Send(0x2a,0b00010100);
+    TLV320AIC3101::I2C_Send(0x2b,0b00000000);
+    TLV320AIC3101::I2C_Send(0x2c,0b00000000);
+    TLV320AIC3101::I2C_Send(0x33,0b10011111);
+    TLV320AIC3101::I2C_Send(0x3f,0b00000000);
+    TLV320AIC3101::I2C_Send(0x41,0b10011111);
+    TLV320AIC3101::I2C_Send(0x65,0b00000001);
+    TLV320AIC3101::I2C_Send(0x66,0b00000010);
 
     //enable DMA on I2S, RX mode
     SPI2->CR2=SPI_CR2_RXDMAEN;
@@ -189,14 +211,3 @@ void TLV320AIC3101::setup()
     NVIC_SetPriority(DMA1_Stream3_IRQn,2); //high prio
     NVIC_EnableIRQ(DMA1_Stream3_IRQn);     //enable interrupt
 }
-
-//-------------------------------TLV320 class constructors------------------------------------------
-TLV320AIC3101& TLV320AIC3101::instance()
-{
-	static TLV320AIC3101 singleton;
-	return singleton;
-}
-
-TLV320AIC3101::TLV320AIC3101(){}
-
-//----------------------------------------------------------------------------------------------------
