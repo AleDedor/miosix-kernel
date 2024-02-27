@@ -61,16 +61,16 @@ unsigned char TLV320AIC3101::I2C_Receive(unsigned char regAddress){
     return data;
 }
 
-//---------------------------Try to get a writable buffer--------------------------------------------
-const unsigned short *getReadableBuff()
+//--------------------------------get a readable buffer----------------------------------------------
+const unsigned short * TLV320AIC3101::getReadableBuff()
 {
     FastInterruptDisableLock dLock;
     const unsigned short *readableBuff;
 
-    //try to find the writable buffer among the 2
+    //try to find the readable buffer among the 2
     while(bq->tryGetReadableBuffer(readableBuff,size)==false){
 
-        //sleep until a buffer is marked as writable
+        //sleep until a buffer is marked as readable
         waiting->IRQwait();
 		{
 			FastInterruptEnableLock eLock(dLock);
@@ -96,6 +96,7 @@ void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
                 DMA_HIFCR_CDMEIF5 | //clear direct mode error flag
                 DMA_HIFCR_CFEIF5;   //clear fifo error interrupt flag
 
+    //mark the buffer as readable
 	bq->bufferFilled(size);
 	waiting->IRQwakeup();
 	if(waiting->IRQgetPriority()>Thread::IRQgetCurrentThread()->IRQgetPriority())
@@ -104,18 +105,21 @@ void __attribute__((used)) I2SdmaHandlerImpl() //actual function implementation
 
 //--------------------Process the bq which is not read or written------------------------------------
 
-/*void TLV320::processBuffer(){
-
+/*void TLV320AIC3101::processBuffer(){
+    Lock<Mutex> l(mutex);
+    
+    unsigned short *buffer;
+    buffer = getReadableBuff();
 
 }*/
 
 //--------------------------Function for starting the I2S DMA RX-----------------------------------------
-static void startRxDMA(){ //needed to make sure that the lock reaches the scopes at the end of the startRX()
+static bool startRxDMA(){ //needed to make sure that the lock reaches the scopes at the end of the startRX()
     
     unsigned short *buffer;
 
     if(bq->tryGetWritableBuffer(buffer) == false){
-        return;
+        return false;
     }
 
     //Start DMA
@@ -129,12 +133,14 @@ static void startRxDMA(){ //needed to make sure that the lock reaches the scopes
 				      DMA_SxCR_MINC    | //Increment RAM pointer after each transfer
 			          DMA_SxCR_TCIE    | //Interrupt on completion
 			  	      DMA_SxCR_EN;       //Start the DMA
+    return true;
 }
 
-void TLV320AIC3101::I2S_startRx()
+bool TLV320AIC3101::I2S_startRx()
 {
     FastInterruptDisableLock dLock;
-    startRxDMA();
+    bool startedDMA = startRxDMA();
+    return startedDMA;
 }
 
 //------------------------Codec initialization and setup method------------------------------------

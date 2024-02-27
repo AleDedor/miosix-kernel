@@ -8,6 +8,8 @@
 using namespace std;
 using namespace miosix;
 
+const unsigned short *readableBuff;
+
 typedef Gpio<GPIOA_BASE,12> ledg1;
 //typedef Gpio<GPIOA_BASE,13> ledg2;
 typedef Gpio<GPIOA_BASE,10> ledy1;
@@ -18,14 +20,14 @@ typedef Gpio<GPIOA_BASE,9> ledr2;
 
 int main()
 {
-    unsigned int val = 1;
+    //unsigned int val = 1;
 
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
 
     TLV320AIC3101::instance().setup();
     //TLV320AIC3101::instance().startRx();
 
-    // check I2C
+    //check I2C
     bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
     unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x0E);
 
@@ -34,12 +36,6 @@ int main()
     }else{
         meter.showVal(0);
     }
-
-    /*if(reg == 0b00001111){
-        meter.showVal(1);
-    } else {
-        meter.showVal(reg << 5);
-    } */
 
     miosix::delayMs(1500);
 
@@ -52,6 +48,7 @@ int main()
     miosix::delayMs(1500);
 
     while(1){
+    /*
         meter.showVal(val);
         delayUs(50);
         //Thread::sleep(1);
@@ -60,6 +57,13 @@ int main()
             meter.clear();
         } 
         val++;
+    */
+        if(TLV320AIC3101::instance().I2S_startRx()){
+            readableBuff = TLV320AIC3101::instance().getReadableBuff();
+            for(int i=0; i<128; i++){
+                meter.showVal(readableBuff[i]);
+            }
+        }
     }
 }
     
