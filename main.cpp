@@ -26,14 +26,15 @@ int main()
     //TLV320AIC3101::instance().startRx();
 
     // check I2C
-    bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x2B,0b00000000);
-    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x2B);
+    bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
+    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x0E);
 
     if(i2cWorked){
         meter.showVal(64300);
     }else{
         meter.showVal(0);
     }
+
     /*if(reg == 0b00001111){
         meter.showVal(1);
     } else {
@@ -42,10 +43,10 @@ int main()
 
     miosix::delayMs(1500);
 
-    if(reg == 0b11111111){
+    if(reg == 0b10001000){
         meter.showVal(0);
     } else {
-        meter.showVal(reg<<5);
+        meter.showVal(64300);
     }
 
     miosix::delayMs(1500);

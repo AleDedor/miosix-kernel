@@ -55,7 +55,7 @@ unsigned char TLV320AIC3101::I2C_Receive(unsigned char regAddress){
     I2C::send(TLV320AIC3101::I2C_address);
     I2C::send(regAddress);
     I2C::sendRepeatedStart();
-    I2C::send( TLV320AIC3101::I2C_address | 0b00000001); //read bit (LSB) to 1   
+    I2C::send(TLV320AIC3101::I2C_address | 0b00000001); //read bit (LSB) to 1   
     data = I2C::recvWithNack();
     I2C::sendStop();
     return data;
