@@ -37,14 +37,16 @@ TLV320AIC3101& TLV320AIC3101::instance()
 
 TLV320AIC3101::TLV320AIC3101(){}
 
-//---------------------------I2C Codec communication function----------------------------------------
-static void TLV320AIC3101::I2C_Send(unsigned char regAddress, char data)
+//---------------------------I2C Codec communication functions---------------------------------------
+bool TLV320AIC3101::I2C_Send(unsigned char regAddress, char data)
 {
+    bool commWorked = false;
     I2C::sendStart();
     I2C::send(TLV320AIC3101::I2C_address);
     I2C::send(regAddress);
-    I2C::send(data);
+    commWorked = I2C::send(data);
     I2C::sendStop();
+    return commWorked;
 }
 
 unsigned char TLV320AIC3101::I2C_Receive(unsigned char regAddress){
@@ -52,6 +54,8 @@ unsigned char TLV320AIC3101::I2C_Receive(unsigned char regAddress){
     I2C::sendStart();
     I2C::send(TLV320AIC3101::I2C_address);
     I2C::send(regAddress);
+    I2C::sendRepeatedStart();
+    I2C::send( TLV320AIC3101::I2C_address | 0b00000001); //read bit (LSB) to 1   
     data = I2C::recvWithNack();
     I2C::sendStop();
     return data;
@@ -187,11 +191,11 @@ void TLV320AIC3101::setup()
     TLV320AIC3101::I2C_Send(0x26,0b00001100);
     TLV320AIC3101::I2C_Send(0x28,0b10000010);
     TLV320AIC3101::I2C_Send(0x29,0b10100000);
-    TLV320AIC3101::I2C_Send(0x2a,0b00010100);
-    TLV320AIC3101::I2C_Send(0x2b,0b00000000);
-    TLV320AIC3101::I2C_Send(0x2c,0b00000000);
+    TLV320AIC3101::I2C_Send(0x2A,0b00010100);
+    TLV320AIC3101::I2C_Send(0x2B,0b00000000);
+    TLV320AIC3101::I2C_Send(0x2C,0b00000000);
     TLV320AIC3101::I2C_Send(0x33,0b10011111);
-    TLV320AIC3101::I2C_Send(0x3f,0b00000000);
+    TLV320AIC3101::I2C_Send(0x3F,0b00000000);
     TLV320AIC3101::I2C_Send(0x41,0b10011111);
     TLV320AIC3101::I2C_Send(0x65,0b00000001);
     TLV320AIC3101::I2C_Send(0x66,0b00000010);

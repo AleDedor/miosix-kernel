@@ -18,24 +18,37 @@ typedef Gpio<GPIOA_BASE,9> ledr2;
 
 int main()
 {
-    unsigned int val = 10096;
+    unsigned int val = 1;
 
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
-
-    miosix::delayMs(50);
 
     TLV320AIC3101::instance().setup();
     //TLV320AIC3101::instance().startRx();
 
     // check I2C
-    miosix::delayMs(50);
-    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x11);
+    bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x2B,0b00000000);
+    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x2B);
 
-    if(reg == 0b00001111){
-        meter.showVal(val);
+    if(i2cWorked){
+        meter.showVal(64300);
+    }else{
+        meter.showVal(0);
+    }
+    /*if(reg == 0b00001111){
+        meter.showVal(1);
     } else {
-        meter.showVal(65535);
-    } 
+        meter.showVal(reg << 5);
+    } */
+
+    miosix::delayMs(1500);
+
+    if(reg == 0b11111111){
+        meter.showVal(0);
+    } else {
+        meter.showVal(reg<<5);
+    }
+
+    miosix::delayMs(1500);
 
     while(1){
         meter.showVal(val);

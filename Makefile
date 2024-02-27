@@ -17,7 +17,7 @@ SUBDIRS := $(KPATH)
 ## List here your source files (both .s, .c and .cpp)
 ##
 SRC :=                                  \
-main.cpp	TLV320AIC3101.cpp
+main.cpp	TLV320AIC3101.cpp 
 
 ##
 ## List here additional static libraries with relative path
