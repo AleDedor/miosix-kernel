@@ -47,6 +47,8 @@ int main()
 
     miosix::delayMs(1500);
 
+    TLV320AIC3101::instance().I2S_startRx();
+
     while(1){
     /*
         meter.showVal(val);
@@ -58,12 +60,13 @@ int main()
         } 
         val++;
     */
+    /*
         if(TLV320AIC3101::instance().I2S_startRx()){
             readableBuff = TLV320AIC3101::instance().getReadableBuff();
             for(int i=0; i<128; i++){
                 meter.showVal(readableBuff[i]);
             }
-        }
+        }*/
     }
 }
     
