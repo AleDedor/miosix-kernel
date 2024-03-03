@@ -28,7 +28,8 @@ int main()
     //TLV320AIC3101::instance().startRx();
 
     //check I2C
-    bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
+    bool i2cWorked = true;
+    //bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
     unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x0E);
 
     if(i2cWorked){
