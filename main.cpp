@@ -28,9 +28,8 @@ int main()
     //TLV320AIC3101::instance().startRx();
 
     //check I2C
-    bool i2cWorked = true;
-    //bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
-    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x03);
+    bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
+    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x0E);
 
     if(i2cWorked){
         meter.showVal(64300);
@@ -40,7 +39,7 @@ int main()
 
     miosix::delayMs(1500);
 
-    if(reg == 0b00010001){
+    if(reg == 0b10001000){
         meter.showVal(0);
     } else {
         meter.showVal(64300);
@@ -48,7 +47,8 @@ int main()
 
     miosix::delayMs(1500);
 
-   // TLV320AIC3101::instance().I2S_startRx();
+    //TLV320AIC3101::instance().I2S_startRx();
+    TLV320AIC3101::instance().test();
 
     while(1){
     /*
@@ -61,13 +61,18 @@ int main()
         } 
         val++;
     */
-    
-        if(TLV320AIC3101::instance().I2S_startRx()){
-            readableBuff = TLV320AIC3101::instance().getReadableBuff();
-            for(int i=0; i<128; i++){
-                meter.showVal(readableBuff[i]);
+        if(entrato){
+            for(int i=0; i<256; i++){
+               meter.showVal(bufferw[i]);
             }
+            TLV320AIC3101::instance().test();
         }
+        /*if(TLV320AIC3101::instance().test()){
+            //readableBuff = TLV320AIC3101::instance().getReadableBuff();
+            for(int i=0; i<128; i++){
+               meter.showVal(buffer[i]);
+            }
+        }*/
     }
 }
     
