@@ -17,11 +17,8 @@ typedef Gpio<GPIOA_BASE,11> ledy2;
 typedef Gpio<GPIOA_BASE,8> ledr1;
 typedef Gpio<GPIOA_BASE,9> ledr2;
 
-
 int main()
 {
-    //unsigned int val = 1;
-
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
 
     TLV320AIC3101::instance().setup();
@@ -47,8 +44,8 @@ int main()
 
     miosix::delayMs(1500);
 
-    //TLV320AIC3101::instance().I2S_startRx();
-    TLV320AIC3101::instance().test();
+    TLV320AIC3101::instance().I2S_startRx();
+    //TLV320AIC3101::instance().test();
 
     while(1){
     /*
@@ -61,18 +58,22 @@ int main()
         } 
         val++;
     */
+    /*
         if(entrato){
             for(int i=0; i<256; i++){
                meter.showVal(bufferw[i]);
             }
             TLV320AIC3101::instance().test();
         }
-        /*if(TLV320AIC3101::instance().test()){
-            //readableBuff = TLV320AIC3101::instance().getReadableBuff();
-            for(int i=0; i<128; i++){
-               meter.showVal(buffer[i]);
+    */
+        if(TLV320AIC3101::instance().I2S_startRx()){
+            readableBuff = TLV320AIC3101::instance().getReadableBuff();
+            for(int i=0; i<256; i++){
+               meter.showVal(readableBuff[i]);
             }
-        }*/
+            TLV320AIC3101::instance().ok();
+        }
+
     }
 }
     
