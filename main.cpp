@@ -44,8 +44,8 @@ int main()
 
     miosix::delayMs(1500);
 
-    TLV320AIC3101::instance().I2S_startRx();
-    //TLV320AIC3101::instance().test();
+    //TLV320AIC3101::instance().I2S_startRx();
+    TLV320AIC3101::instance().test();
 
     while(1){
     /*
@@ -58,15 +58,16 @@ int main()
         } 
         val++;
     */
-    /*
-        if(entrato){
+
+    // debug I2S, use test() to start communication with DMA (RX)
+    // when communication is completed, interrupt is called. showVal() only at that moment
+        if(TLV320AIC3101::IRQ_entrato){
             for(int i=0; i<256; i++){
                meter.showVal(bufferw[i]);
             }
             TLV320AIC3101::instance().test();
         }
-    */
-        if(TLV320AIC3101::instance().I2S_startRx())
+    /*  if(TLV320AIC3101::instance().I2S_startRx())
         {
             readableBuff = TLV320AIC3101::instance().getReadableBuff();
             for(int i=0; i<256; i++){
@@ -74,7 +75,7 @@ int main()
             }
             TLV320AIC3101::instance().ok();
         }
-
+    */
     }
 }
     
