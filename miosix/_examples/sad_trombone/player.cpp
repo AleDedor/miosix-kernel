@@ -398,7 +398,7 @@ void Player::play(Sound& sound)
     SPI3->I2SPR=  SPI_I2SPR_MCKOE | 6;
 	SPI3->I2SCFGR=SPI_I2SCFGR_I2SMOD    //I2S mode selected
                 | SPI_I2SCFGR_I2SE      //I2S Enabled
-                | SPI_I2SCFGR_I2SCFG_1; //Master transmit
+                | SPI_I2SCFGR_I2SCFG_2; //Master receive
 
     NVIC_SetPriority(DMA1_Stream5_IRQn,2);//High priority for DMA
 	NVIC_EnableIRQ(DMA1_Stream5_IRQn);    
