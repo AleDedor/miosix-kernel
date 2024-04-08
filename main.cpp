@@ -43,7 +43,7 @@ int main()
 
     miosix::delayMs(1500);
 
-    TLV320AIC3101::instance().I2S_startRx();
+    //TLV320AIC3101::instance().I2S_startRx();
 
     while(1){
     /*
@@ -65,14 +65,14 @@ int main()
             }
             TLV320AIC3101::instance().test();
         }*/
-      //if(TLV320AIC3101::instance().I2S_startRx())
-       // {
+        if(TLV320AIC3101::instance().I2S_startRx())
+        {
             readableBuff = TLV320AIC3101::instance().getReadableBuff();
             for(int i=0; i<256; i++){
                meter.showVal(readableBuff[i]);
             }
             TLV320AIC3101::instance().ok();
-        //}
+        }
     
     }
 }
