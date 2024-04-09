@@ -4,6 +4,7 @@
 #include "vumeter.h"
 #include <interfaces/delays.h>
 #include "TLV320AIC3101.h"
+#include <thread>
 
 using namespace std;
 using namespace miosix;
@@ -21,11 +22,25 @@ int main()
 {
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
 
-    TLV320AIC3101::instance().setup();
+    auto& driver=TLV320AIC3101::instance();
+    driver.setup();
+
+    thread leds([]{ 
+        while(1){
+            ledg1::high();
+            Thread::sleep(500);
+            ledg1::low();
+            Thread::sleep(500);
+        }
+     });
+
+     leds.detach();
+
+
 
     //check I2C
-    bool i2cWorked = TLV320AIC3101::instance().I2C_Send(0x0E,0b10001000);
-    unsigned char reg = TLV320AIC3101::instance().I2C_Receive(0x0E);
+    bool i2cWorked = driver.I2C_Send(0x0E,0b10001000);
+    unsigned char reg = driver.I2C_Receive(0x0E);
 
     if(i2cWorked){
         meter.showVal(64300);
@@ -65,13 +80,17 @@ int main()
             }
             TLV320AIC3101::instance().test();
         }*/
-        if(TLV320AIC3101::instance().I2S_startRx())
+
+        // CONFIGURARE ENTRAMBE LE ISR PER TX E RX!!!!!!
+        if(driver.I2S_startRx())
         {
-            readableBuff = TLV320AIC3101::instance().getReadableBuff();
+            iprintf("bmain\n");
+            readableBuff = driver.getReadableBuff();
+            iprintf("read_buffer= %p\n",readableBuff);
             for(int i=0; i<256; i++){
                meter.showVal(readableBuff[i]);
             }
-            TLV320AIC3101::instance().ok();
+            driver.ok();
         }
     
     }
