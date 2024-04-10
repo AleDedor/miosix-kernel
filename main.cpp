@@ -25,6 +25,7 @@ int main()
     auto& driver=TLV320AIC3101::instance();
     driver.setup();
 
+    /*
     thread leds([]{ 
         while(1){
             ledg1::high();
@@ -34,7 +35,7 @@ int main()
         }
      });
 
-     leds.detach();
+     leds.detach();*/
 
 
 
@@ -85,9 +86,10 @@ int main()
         if(driver.I2S_startRx()){
             //iprintf("bmain\n");
             readableBuff = driver.getReadableBuff();
-            iprintf("read_buffer= %p\n",readableBuff);
+            //iprintf("read_buffer= %p\n",readableBuff);
             for(int i=0; i<256; i++){
                meter.showVal(readableBuff[i]);
+               //iprintf("audio_val= %d\n",readableBuff[i]);
             }
             driver.ok();
         }
