@@ -82,9 +82,8 @@ int main()
         }*/
 
         // CONFIGURARE ENTRAMBE LE ISR PER TX E RX!!!!!!
-        if(driver.I2S_startRx())
-        {
-            iprintf("bmain\n");
+        if(driver.I2S_startRx()){
+            //iprintf("bmain\n");
             readableBuff = driver.getReadableBuff();
             iprintf("read_buffer= %p\n",readableBuff);
             for(int i=0; i<256; i++){
