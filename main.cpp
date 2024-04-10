@@ -87,9 +87,9 @@ int main()
             //iprintf("bmain\n");
             readableBuff = driver.getReadableBuff();
             //iprintf("read_buffer= %p\n",readableBuff);
-            for(int i=0; i<256; i++){
+            for(int i=0; i<128; i++){
                meter.showVal(readableBuff[i]);
-               //iprintf("audio_val= %d\n",readableBuff[i]);
+               iprintf("audio_val= %d\n",readableBuff[i]);
             }
             driver.ok();
         }
