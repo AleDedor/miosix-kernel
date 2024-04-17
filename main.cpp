@@ -45,16 +45,20 @@ int main()
 
     if(i2cWorked){
         meter.showVal(64300);
+        iprintf("I2C OK!\n");
     }else{
         meter.showVal(0);
+        iprintf("I2C broken :(\n");
     }
 
     miosix::delayMs(1500);
 
     if(reg == 0b10001000){
         meter.showVal(0);
+        iprintf("Codec registers ok!\n");
     } else {
         meter.showVal(64300);
+        iprintf("Codec registers not ok :(\n");
     }
 
     miosix::delayMs(1500);
@@ -84,9 +88,10 @@ int main()
 
         // CONFIGURARE ENTRAMBE LE ISR PER TX E RX!!!!!!
         if(driver.I2S_startRx()){
-            //iprintf("bmain\n");
+            iprintf("in main, waiting for IRQ...\n");
             readableBuff = driver.getReadableBuff();
             //iprintf("read_buffer= %p\n",readableBuff);
+            iprintf("found readable buffer\n");
             for(int i=0; i<128; i++){
                meter.showVal(readableBuff[i]);
                iprintf("audio_val= %d\n",readableBuff[i]);
