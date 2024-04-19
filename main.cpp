@@ -23,9 +23,8 @@ int main()
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
 
     auto& driver=TLV320AIC3101::instance();
-    driver.setup();
 
-    /*
+    
     thread leds([]{ 
         while(1){
             ledg1::high();
@@ -34,13 +33,12 @@ int main()
             Thread::sleep(500);
         }
      });
+    leds.detach();
 
-     leds.detach();*/
-
-
+    driver.setup();
 
     //check I2C
-    bool i2cWorked = driver.I2C_Send(0x0E,0b10001000);
+    bool i2cWorked = driver.I2C_Send(0x03,0b00010001);
     unsigned char reg = driver.I2C_Receive(0x0E);
 
     if(i2cWorked){
@@ -64,6 +62,7 @@ int main()
     miosix::delayMs(1500);
 
     //TLV320AIC3101::instance().I2S_startRx();
+    driver.I2S_startRx();
 
     while(1){
     /*
@@ -85,19 +84,28 @@ int main()
             }
             TLV320AIC3101::instance().test();
         }*/
-
-        // CONFIGURARE ENTRAMBE LE ISR PER TX E RX!!!!!!
+        /*
         if(driver.I2S_startRx()){
             iprintf("in main, waiting for IRQ...\n");
             readableBuff = driver.getReadableBuff();
-            //iprintf("read_buffer= %p\n",readableBuff);
-            iprintf("found readable buffer\n");
-            for(int i=0; i<128; i++){
+            iprintf("read_buffer= %p\n",readableBuff);
+            //iprintf("found readable buffer\n");
+            for(int i=0; i<255; i++){
                meter.showVal(readableBuff[i]);
-               iprintf("audio_val= %d\n",readableBuff[i]);
+               //iprintf("audio_val= %d\n",readableBuff[i]);
             }
             driver.ok();
         }
+        */
+        iprintf("in main, waiting for IRQ...\n");
+        readableBuff = driver.getReadableBuff();
+            for(int i=0; i<255; i++){
+                meter.showVal(readableBuff[i]);
+                //iprintf("audio_val= %d\n",readableBuff[i]);
+            }
+        driver.ok();
+        driver.I2S_startRx();
+
     
     }
 }
