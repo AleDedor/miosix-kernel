@@ -99,7 +99,7 @@ int main()
         */
         iprintf("in main, waiting for IRQ...\n");
         readableBuff = driver.getReadableBuff();
-            for(int i=0; i<255; i++){
+            for(int i=0; i<128; i++){
                 meter.showVal(readableBuff[i]);
                 //iprintf("audio_val= %d\n",readableBuff[i]);
             }
