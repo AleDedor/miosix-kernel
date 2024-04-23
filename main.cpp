@@ -36,6 +36,7 @@ int main()
     leds.detach();
     */
 
+
     driver.setup();
 
     //check I2C
@@ -63,7 +64,9 @@ int main()
     miosix::delayMs(1500);
 
     //TLV320AIC3101::instance().I2S_startRx();
-    driver.I2S_startRx();
+    //driver.I2S_startRx();
+
+    miosix::delayMs(1);
 
     while(1){
     /*
@@ -98,13 +101,15 @@ int main()
             driver.ok();
         }
         */
-        iprintf("in main, waiting for IRQ...\n");
+        while(!driver.I2S_startRx()){}
+        //iprintf("in main, waiting for IRQ...\n");
         readableBuff = driver.getReadableBuff();
-        for(int i=0; i<128; i++){
+        delayUs(10);
+        /*for(int i=0; i<128; i++){
             meter.showVal(readableBuff[i]);
-        }
-        driver.ok();
-        driver.I2S_startRx();
+        }*/
+        driver.I2S_startTx(readableBuff);
+        
     }
 }
 
