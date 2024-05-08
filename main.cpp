@@ -66,7 +66,7 @@ int main()
     //TLV320AIC3101::instance().I2S_startRx();
     //driver.I2S_startRx();
 
-    miosix::delayMs(1);
+    miosix::delayMs(10);
 
     while(1){
     /*
@@ -104,10 +104,11 @@ int main()
         while(!driver.I2S_startRx()){}
         //iprintf("in main, waiting for IRQ...\n");
         readableBuff = driver.getReadableBuff();
-        delayUs(10);
-        /*for(int i=0; i<128; i++){
+        
+        for(int i=0; i<128; i++){
             meter.showVal(readableBuff[i]);
-        }*/
+            delayUs(1000);
+        }
         driver.I2S_startTx(readableBuff);
         
     }
