@@ -18,10 +18,24 @@ typedef Gpio<GPIOA_BASE,11> ledy2;
 typedef Gpio<GPIOA_BASE,8> ledr1;
 typedef Gpio<GPIOA_BASE,9> ledr2;
 
+
+// Multithreadingggg
+Mutex mutex;
+uint16_t filtered_sound = 0;
+
+void threadfunc(){
+    Lock<Mutex> lock(mutex);
+    for(int i=0; i<128; i++){
+        filtered_sound += readableBuff[i];
+    }
+    filtered_sound = filtered_sound/128;
+    iprintf("in thread, mutex locked %d\n", filtered_sound); 
+}
+
 int main()
 {
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
-
+    Thread *led_thread;
     auto& driver=TLV320AIC3101::instance();
 
     /*
@@ -67,6 +81,9 @@ int main()
     //driver.I2S_startRx();
 
     miosix::delayMs(10);
+    // adding thread to manage the vumeter
+    iprintf("In main trying to create thread... \n");
+    led_thread=Thread::create(threadfunc, 2048, 1, Thread::JOINABLE);
 
     while(1){
     /*
@@ -101,17 +118,36 @@ int main()
             driver.ok();
         }
         */
+
+       /* this is working */
+       /*
         while(!driver.I2S_startRx()){}
-        //iprintf("in main, waiting for IRQ...\n");
         readableBuff = driver.getReadableBuff();
-        
         for(int i=0; i<128; i++){
             meter.showVal(readableBuff[i]);
             delayUs(1000);
         }
         driver.I2S_startTx(readableBuff);
-        
+        */
+
+       //idea here is to get readablebuffer lock a mutex to call a filter thread which writes filtered
+       //value on a shared variable (global) 
+        while(!driver.I2S_startRx()){}
+        readableBuff = driver.getReadableBuff();
+        iprintf("in main, data received ok\n");       
+        {
+            Lock<Mutex> lock(mutex);
+            iprintf("in main, mutex locked %d\n", filtered_sound); 
+            meter.showVal(filtered_sound);
+            delayUs(1000);
+            filtered_sound = 0;
+        }
+
+        driver.I2S_startTx(readableBuff);
+
     }
+
+    led_thread->join();
 }
 
 
