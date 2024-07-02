@@ -11,6 +11,8 @@ using namespace miosix;
 
 const unsigned short *readableBuff;
 
+Mutex mutex;
+
 typedef Gpio<GPIOA_BASE,12> ledg1;
 //typedef Gpio<GPIOA_BASE,13> ledg2;
 typedef Gpio<GPIOA_BASE,10> ledy1;
@@ -18,40 +20,29 @@ typedef Gpio<GPIOA_BASE,11> ledy2;
 typedef Gpio<GPIOA_BASE,8> ledr1;
 typedef Gpio<GPIOA_BASE,9> ledr2;
 
-Mutex mutex;
 
 
-// Multithreadingggg
-/*Mutex mutex;
-uint16_t filtered_sound = 0;
+void threadfunc(void *argv){
 
-void threadfunc(){
-    Lock<Mutex> lock(mutex);
-    for(int i=0; i<128; i++){
-        filtered_sound += readableBuff[i];
+    Vumeter meter2(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
+
+    while(1){
+        {
+        Lock<Mutex> lock(mutex);
+            if (readableBuff != nullptr) { 
+                //extremely rough (but working) implementation, every 50ms only the first element of the buffer is printed on the vu-meter
+                meter2.showVal(readableBuff[0]);               
+            }
+        }
+        Thread::sleep(50);
     }
-    filtered_sound = filtered_sound/128;
-    iprintf("in thread, mutex locked %d\n", filtered_sound); 
-}*/
+}
+
 
 int main()
 {
     Vumeter meter(ledr1::getPin(),ledr2::getPin(),ledy1::getPin(),ledy2::getPin(),ledg1::getPin());
-    //Thread *led_thread;
     auto& driver=TLV320AIC3101::instance();
-
-    /*
-    thread leds([]{ 
-        while(1){
-            ledg1::high();
-            Thread::sleep(500);
-            ledg1::low();
-            Thread::sleep(500);
-        }
-     });
-    leds.detach();
-    */
-
 
     driver.setup();
 
@@ -67,7 +58,7 @@ int main()
         iprintf("I2C not ok!\n");
     }
 
-    miosix::delayMs(1500);
+    Thread::sleep(1500); //delay to be able to see the LEDS turn on if everything is ok
 
     if(reg == 0b10001000){
         meter.showVal(0);
@@ -77,81 +68,26 @@ int main()
         iprintf("Codec registers not ok!\n");
     }
 
-    miosix::delayMs(1500);
-
-    miosix::delayMs(10);
     // adding thread to manage the vumeter
-    //iprintf("In main trying to create thread... \n");
-    //led_thread=Thread::create(threadfunc, 2048, 1, Thread::JOINABLE);
+    Thread *led_thread;
+    led_thread = Thread::create(threadfunc, 256, 1);
 
-    while(1){
-    /*
-        meter.showVal(val);
-        delayUs(50);
-        //Thread::sleep(1);
-        if(val >= 65535){
-            val=0;
-            meter.clear();
-        } 
-        val++;
-    */
+    while(1){ 
 
-    // debug I2S, use test() to start communication with DMA (RX)
-    // when communication is completed, interrupt is called. showVal() only at that moment
-    /*    if(TLV320AIC3101::IRQ_entrato){
-            for(int i=0; i<256; i++){
-               meter.showVal(bufferw[i]);
-            }
-            TLV320AIC3101::instance().test();
-        }*/
-        /*
-        if(driver.I2S_startRx()){
-            iprintf("in main, waiting for IRQ...\n");
-            readableBuff = driver.getReadableBuff();
-            iprintf("read_buffer= %p\n",readableBuff);
-            //iprintf("found readable buffer\n");
-            for(int i=0; i<255; i++){
-               meter.showVal(readableBuff[i]);
-               //iprintf("audio_val= %d\n",readableBuff[i]);
-            }
-            driver.ok();
+        while(!driver.I2S_startRx()){
+            //to avoid busy waiting we put the thread to sleep for a short while
+            Thread::nanoSleep(10000);
         }
-        */
 
-       /* this is working */
-        while(!driver.I2S_startRx()){}
-        readableBuff = driver.getReadableBuff();
-        /*
-        for(int i=0; i<128; i++){
-            meter.showVal(readableBuff[i]);
-            //miosix::delayUs(1000);
-            Thread::sleep(1);
-        }*/
-
-        driver.I2S_startTx(readableBuff);
-
-        Thread::nanoSleep(10000);
-
-        
-
-       //idea here is to get readablebuffer lock a mutex to call a filter thread which writes filtered
-       //value on a shared variable (global) 
-      /*  while(!driver.I2S_startRx()){}
-        readableBuff = driver.getReadableBuff();
-        iprintf("in main, data received ok\n");       
         {
             Lock<Mutex> lock(mutex);
-            iprintf("in main, mutex locked %d\n", filtered_sound); 
-            meter.showVal(filtered_sound);
-            delayUs(1000);
-            filtered_sound = 0;
+            readableBuff = driver.getReadableBuff();
+            driver.I2S_startTx(readableBuff);
         }
-
-        driver.I2S_startTx(readableBuff); */
-
+   
     }
 
-    //led_thread->join();
+    led_thread->join();
 }
 
 
