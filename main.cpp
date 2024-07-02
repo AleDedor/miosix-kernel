@@ -18,6 +18,8 @@ typedef Gpio<GPIOA_BASE,11> ledy2;
 typedef Gpio<GPIOA_BASE,8> ledr1;
 typedef Gpio<GPIOA_BASE,9> ledr2;
 
+Mutex mutex;
+
 
 // Multithreadingggg
 /*Mutex mutex;
@@ -59,10 +61,10 @@ int main()
 
     if(i2cWorked){
         meter.showVal(64300);
-        iprintf("I2C OK!\n");
+        iprintf("I2C ok!\n");
     }else{
         meter.showVal(0);
-        iprintf("I2C broken :(\n");
+        iprintf("I2C not ok!\n");
     }
 
     miosix::delayMs(1500);
@@ -72,7 +74,7 @@ int main()
         iprintf("Codec registers ok!\n");
     } else {
         meter.showVal(64300);
-        iprintf("Codec registers not ok :(\n");
+        iprintf("Codec registers not ok!\n");
     }
 
     miosix::delayMs(1500);
@@ -117,14 +119,19 @@ int main()
         */
 
        /* this is working */
-       
         while(!driver.I2S_startRx()){}
         readableBuff = driver.getReadableBuff();
+        /*
         for(int i=0; i<128; i++){
             meter.showVal(readableBuff[i]);
+            //miosix::delayUs(1000);
             Thread::sleep(1);
-        }
+        }*/
+
         driver.I2S_startTx(readableBuff);
+
+        Thread::nanoSleep(10000);
+
         
 
        //idea here is to get readablebuffer lock a mutex to call a filter thread which writes filtered
