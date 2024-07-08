@@ -28,7 +28,7 @@ void threadfunc(void *argv){
 
     while(1){
         {
-        Lock<Mutex> lock(mutex);
+            Lock<Mutex> lock(mutex);
             if (readableBuff != nullptr) { 
                 //extremely rough (but working) implementation, every 50ms only the first element of the buffer is printed on the vu-meter
                 meter2.showVal(readableBuff[0]);               
@@ -53,7 +53,7 @@ int main()
     if(i2cWorked){
         meter.showVal(64300);
         iprintf("I2C ok!\n");
-    }else{
+    } else {
         meter.showVal(0);
         iprintf("I2C not ok!\n");
     }
@@ -71,12 +71,13 @@ int main()
     // adding thread to manage the vumeter
     Thread *led_thread;
     led_thread = Thread::create(threadfunc, 256, 1);
+    iprintf("Thread creato\n");
 
     while(1){ 
 
         while(!driver.I2S_startRx()){
             //to avoid busy waiting we put the thread to sleep for a short while
-            Thread::nanoSleep(10000);
+            Thread::nanoSleep(100000);  
         }
 
         {
